@@ -234,7 +234,13 @@ function getRollupOutputOptions(
     freeze: !isProduction,
     interop: false,
     name: globalName,
-    sourcemap: false,
+    sourcemap: true,
+    sourcemapPathTransform(relativeSourcePath, sourcemapPath) {
+      return relativeSourcePath.replace(
+        '../../../../packages',
+        '/Users/qianlong/Desktop/code/min-react-analysis/react/packages'
+      );
+    },
     esModule: false,
   };
 }
@@ -388,12 +394,12 @@ function getPlugins(
         !isProduction
       )
     ),
-    // Remove 'use strict' from individual source files.
-    {
-      transform(source) {
-        return source.replace(/['"]use strict["']/g, '');
-      },
-    },
+    // // Remove 'use strict' from individual source files.
+    // {
+    //   transform(source) {
+    //     return source.replace(/['"]use strict["']/g, '');
+    //   },
+    // },
     // Turn __DEV__ and process.env checks into constants.
     replace({
       __DEV__: isProduction ? 'false' : 'true',
@@ -409,39 +415,39 @@ function getPlugins(
     // I'm going to port "art" to ES modules to avoid this problem.
     // Please don't enable this for anything else!
     isUMDBundle && entry === 'react-art' && commonjs(),
-    // Apply dead code elimination and/or minification.
-    isProduction &&
-      closure(
-        Object.assign({}, closureOptions, {
-          // Don't let it create global variables in the browser.
-          // https://github.com/facebook/react/issues/10909
-          assume_function_wrapper: !isUMDBundle,
-          renaming: !shouldStayReadable,
-        })
-      ),
-    // HACK to work around the fact that Rollup isn't removing unused, pure-module imports.
-    // Note that this plugin must be called after closure applies DCE.
-    isProduction && stripUnusedImports(pureExternalModules),
-    // Add the whitespace back if necessary.
-    shouldStayReadable &&
-      prettier({
-        parser: 'babel',
-        singleQuote: false,
-        trailingComma: 'none',
-        bracketSpacing: true,
-      }),
-    // License and haste headers, top-level `if` blocks.
-    {
-      renderChunk(source) {
-        return Wrappers.wrapBundle(
-          source,
-          bundleType,
-          globalName,
-          filename,
-          moduleType
-        );
-      },
-    },
+    // // Apply dead code elimination and/or minification.
+    // isProduction &&
+    //   closure(
+    //     Object.assign({}, closureOptions, {
+    //       // Don't let it create global variables in the browser.
+    //       // https://github.com/facebook/react/issues/10909
+    //       assume_function_wrapper: !isUMDBundle,
+    //       renaming: !shouldStayReadable,
+    //     })
+    //   ),
+    // // HACK to work around the fact that Rollup isn't removing unused, pure-module imports.
+    // // Note that this plugin must be called after closure applies DCE.
+    // isProduction && stripUnusedImports(pureExternalModules),
+    // // Add the whitespace back if necessary.
+    // shouldStayReadable &&
+    //   prettier({
+    //     parser: 'babel',
+    //     singleQuote: false,
+    //     trailingComma: 'none',
+    //     bracketSpacing: true,
+    //   }),
+    // // License and haste headers, top-level `if` blocks.
+    // {
+    //   renderChunk(source) {
+    //     return Wrappers.wrapBundle(
+    //       source,
+    //       bundleType,
+    //       globalName,
+    //       filename,
+    //       moduleType
+    //     );
+    //   },
+    // },
     // Record bundle size.
     sizes({
       getSize: (size, gzip) => {

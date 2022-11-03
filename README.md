@@ -266,7 +266,11 @@ NameHook.queue.pending = update2 -> update1
 
 
 
-# React 源码调试
+# React 源码
+
+#
+
+
 
 
 
@@ -288,3 +292,5 @@ NameHook.queue.pending = update2 -> update1
 # 参考
 
 https://react.iamkasong.com/
+
+https://juejin.cn/book/7070324244772716556/section/7137083930078871589
