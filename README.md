@@ -246,7 +246,7 @@ const App = () => {
 NameHook.queue.pending = update2 -> update1
 ```
 
-在实际 React 中会去具体消费 update 对象，从而计算出 state 
+在实际 React 中会去具体消费 update 对象，可能存在批量更新，从而计算出 state 
 
 
 
