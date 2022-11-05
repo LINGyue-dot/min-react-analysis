@@ -254,6 +254,7 @@ export function updateContainer(
   callback: ?Function,
 ): Lane {
   if (__DEV__) {
+    // 不执行
     onScheduleRoot(container, element);
   }
   const current = container.current;

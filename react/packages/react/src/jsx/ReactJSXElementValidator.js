@@ -229,6 +229,7 @@ function validatePropTypes(element) {
     }
     let propTypes;
     if (typeof type === 'function') {
+      // SEAN 静态属性
       propTypes = type.propTypes;
     } else if (
       typeof type === 'object' &&

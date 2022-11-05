@@ -3099,6 +3099,7 @@ function beginWork(
     }
   }
 
+  // 更新
   if (current !== null) {
     const oldProps = current.memoizedProps;
     const newProps = workInProgress.pendingProps;

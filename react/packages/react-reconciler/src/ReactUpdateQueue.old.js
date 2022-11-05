@@ -150,6 +150,7 @@ if (__DEV__) {
 }
 
 export function initializeUpdateQueue<State>(fiber: Fiber): void {
+  // 传入的是 rootFiber 
   const queue: UpdateQueue<State> = {
     baseState: fiber.memoizedState,
     firstBaseUpdate: null,

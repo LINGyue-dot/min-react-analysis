@@ -21,6 +21,7 @@ const hasPerformanceNow =
 
 if (hasPerformanceNow) {
   const localPerformance = performance;
+  // performance.now() 返回的是当前页面停留的时间，
   getCurrentTime = () => localPerformance.now();
 } else {
   const localDate = Date;

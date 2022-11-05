@@ -64,6 +64,7 @@ if (__DEV__) {
     const rootEl = getReactRootElementInContainer(container);
     const hasNonRootReactChild = !!(rootEl && getInstanceFromNode(rootEl));
 
+    // 保证 渲染挂载的节点不是 document 以及没有自元素
     if (hasNonRootReactChild && !isRootRenderedBySomeReact) {
       console.error(
         'render(...): Replacing React-rendered children with a new root ' +
@@ -74,6 +75,8 @@ if (__DEV__) {
     }
 
     if (
+      // 1 就是正常的 div p
+      // 9 就是 document
       container.nodeType === ELEMENT_NODE &&
       ((container: any): Element).tagName &&
       ((container: any): Element).tagName.toUpperCase() === 'BODY'

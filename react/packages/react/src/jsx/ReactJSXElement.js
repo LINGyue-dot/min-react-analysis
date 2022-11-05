@@ -129,7 +129,7 @@ function defineRefPropWarningGetter(props, displayName) {
  * the class pattern, so do not use new to call it. Also, instanceof check
  * will not work. Instead test $$typeof field against Symbol.for('react.element') to check
  * if something is a React Element.
- *
+ * 根据 jsx 生成对应的 Element 对象
  * @param {*} type
  * @param {*} props
  * @param {*} key

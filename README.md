@@ -254,8 +254,6 @@ NameHook.queue.pending = update2 -> update1
 
 ### TODO
 
-
-
 * update 对象实例的 action 具体是什么？
 * hook 为什么不能写在条件/循环语句中
 * queue.pending 在哪？
@@ -268,7 +266,206 @@ NameHook.queue.pending = update2 -> update1
 
 # React 源码
 
-#
+## JSX 到 fiber
+
+JSX 和 Vue template 一样都会经过 babel 将其转义为一个个函数，React 中就是转化为 `React.createElement` 
+
+即 JSX 都会通过 `createElement` 转为一个个 `Element` 对象，该结构大致为
+
+```js
+  const element = {
+    // 标记这是个 Element 对象
+    $$typeof: REACT_ELEMENT_TYPE,
+    // type 可能为类组件、函数组件、div 等原生 html
+    // 类组件以及函数组件 type 就是一个函数
+    type: type,
+    key: key,
+    ref: ref,
+    props: props,
+    _owner: owner,
+  };
+```
+
+区分类组件还是函数组件是利用原型链上的 `isReactComponent` 
+
+```js
+ClassComponent.prototype.isReactComponent = {}
+```
+
+
+
+fiber 节点就是根据 `Element` 对象来进行生成的，并且多了
+
+* 组件更新的优先级
+* 组件的 state
+* 组件的 `rerender` 标志
+* ...
+
+
+
+fiber 的几个特殊字段
+
+```js
+{
+  memoizedProps // 父组件的 prop
+  stateNode // DOM 实例
+  
+}
+```
+
+### fiberRoot rootFiber
+
+- `fiberRoot`：首次构建应用， 创建一个 fiberRoot ，作为整个 React 应用的根基。
+
+- `rootFiber`： 如下通过 ReactDOM.render 渲染出来的，如上 Index 可以作为一个 rootFiber。一个 React 应用可以有多 ReactDOM.render 创建的 rootFiber ，但是只能有一个 fiberRoot（应用根节点）。
+
+![img](https://typora-1300781048.cos.ap-beijing.myqcloud.com/img/202211051048045)
+
+> 每次调和都从 rootFiber 开始
+
+
+
+
+
+## 初始化/更新
+
+整个的初始化/更新可以分为 `render` `commit` 阶段，本质上就是一个构建 wip 树以及更新的过程
+
+**全部操作都发生在 wip 树上**
+
+* render 阶段（前序遍历并回溯的过程）
+  * beginWork（前序遍历）：生成 wip fiber 树并 diff 给对应的 fiber 打上 effect tag
+  * completeWork（回溯）
+* commit 阶段
+
+
+
+### render beginWork 
+
+![img](https://typora-1300781048.cos.ap-beijing.myqcloud.com/img/202211032346442.png)
+
+>  current 是 current 树上对应的 fiber 节点（即上一次更新的 fiber 节点）
+
+根据 current 的值，来判断是 update 还是 mount
+
+
+
+#### mount 初始化
+
+根据 fiber.tag 不同，来走不同的创建子 fiber 的逻辑
+
+
+
+#### update 更新
+
+会根据 props 和 type 与 current 的一致来决定是否复用，如果一致就复用
+
+* 复用的话就会进入 diff 算法来生成带有 effectTag 的子 fiber 节点
+* 不复用的话 **TODO**
+
+
+
+> effectTag 为 Placement 就是插入
+
+最后挂载到 rootFiber 上
+
+```js
+                       nextEffect         nextEffect
+rootFiber.firstEffect -----------> fiber -----------> fiber
+```
+
+
+
+**执行顺序**
+
+<img src="https://typora-1300781048.cos.ap-beijing.myqcloud.com/img/202211040020555.png" alt="image-20221104002015500" style="zoom:50%;" />
+
+
+
+### render completeWork
+
+<img src="https://typora-1300781048.cos.ap-beijing.myqcloud.com/img/202211032345300.png" alt="img" style="zoom:50%;" />
+
+
+
+同样是根据 current 来进行分辨 update 还是 mount
+
+* mount ：根据 beginWork 的 fiber 树以及 effectList 来生成一个完整的离屏的 DOM 
+
+* update ：存在 DOM 不需要生成了，主要处理 props 
+
+  * onClick 、onChange 等回调函数的注册
+  * 处理 style 、prop
+  * 处理 children prop
+
+  在 `updateHostComponent` 中，父组件处理完传递给该 `HostComponent` 的 prop 之后，会将 
+
+被处理完的`props`会被赋值给`workInProgress.updateQueue`，并最终会在`commit阶段`被渲染在页面上。 ？？？ **什么意思，wip 此时指向谁？这个 props**
+
+
+
+
+
+## 初始化全流程
+
+
+
+1. JSX 构建生成 element 树
+2. element 树构建生成 fiber 树
+
+
+
+
+
+render 阶段
+
+* beginWork 阶段，mounted 初始化的话就生成新 fiber 节点，update 的话就生成带 effectTag 的 Fiber 节点
+
+
+
+
+
+## 更新全流程
+
+
+
+
+
+
+
+# Debug
+
+* jsxDEV
+* ReactElement 生成 Element 对象
+
+是从叶节点向上生成的？？TODO
+
+
+
+* react/packages/react-dom/src/client/ReactDOMLegacy.js render 函数
+* render --》 构建出 fiberRoot
+
+![image-20221105115436942](https://typora-1300781048.cos.ap-beijing.myqcloud.com/img/202211051154293.png)
+
+
+
+* updateContainer 里面会创建 update 对象，并利用 enqueueUpdate 进行
+
+![image-20221105124250840](https://typora-1300781048.cos.ap-beijing.myqcloud.com/img/202211051242092.png)
+
+
+
+**update 对象挂在哪？** 在 fiber 上，那 fiber.memorizeState 的 hook 链表上的 hook 对象上的 pending 是什么？
+
+`react/packages/react-reconciler/src/ReactUpdateQueue.old.js`  enqueueUpdate
+
+
+
+此时完成了 fiberRoot 的构建，current 树还是只有一个 rootFiber 节点
+
+
+
+leygcy 入口 `react/packages/react-reconciler/src/ReactFiberWorkLoop.old.js`  performSyncWorkOnRoot
 
 
 
@@ -284,10 +481,13 @@ NameHook.queue.pending = update2 -> update1
 
 
 
+* completeWork 的处理 props 
+* 什么时候执行的 render 函数
 * React 自己实现了事件机制来适配跨平台、Vue 不自己实现事件机制如何适配跨平台的？
 * hook 为什么不能写在循环、条件判断中
+* 为什么要有 fiber ，目前 legcy 模式下又没有异步可中断，是用来过渡吗？最终服务于 concurrent 模式吗？
 
-
+* useRef
 
 # 参考
 

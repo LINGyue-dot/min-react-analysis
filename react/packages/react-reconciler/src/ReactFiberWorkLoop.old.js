@@ -571,10 +571,10 @@ export function scheduleUpdateOnFiber(
     ) {
       // Register pending interactions on the root to avoid losing traced interaction data.
       schedulePendingInteractions(root, lane);
-
       // This is a legacy edge case. The initial mount of a ReactDOM.render-ed
       // root inside of batchedUpdates should be synchronous, but layout updates
       // should be deferred until the end of the batch.
+      // 等 fiber 树构建完成之后再执行渲染
       performSyncWorkOnRoot(root);
     } else {
       ensureRootIsScheduled(root, eventTime);

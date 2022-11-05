@@ -117,6 +117,13 @@ ReactDOMRoot.prototype.unmount = ReactDOMBlockingRoot.prototype.unmount = functi
   });
 };
 
+/**
+ * 生成 fiberRoot 初始化部分属性，并监听所有原生事件
+ * @param {*} container
+ * @param {*} tag
+ * @param {*} options
+ * @returns
+ */
 function createRootImpl(
   container: Container,
   tag: RootTag,
@@ -132,6 +139,7 @@ function createRootImpl(
       options.hydrationOptions.mutableSources) ||
     null;
   const root = createContainer(container, tag, hydrate, hydrationCallbacks);
+  // 将 fiber 节点挂载到 DOM 节点属性上
   markContainerAsRoot(root.current, container);
   const containerNodeType = container.nodeType;
 
