@@ -303,12 +303,13 @@ fiber 节点就是根据 `Element` 对象来进行生成的，并且多了
 
 
 
-fiber 的几个特殊字段
+### fiber 的几个特殊字段
 
 ```js
 {
   memoizedProps // 父组件的 prop
   stateNode // DOM 实例
+  memoizedState // state 值
   
 }
 ```
@@ -322,6 +323,104 @@ fiber 的几个特殊字段
 ![img](https://typora-1300781048.cos.ap-beijing.myqcloud.com/img/202211051048045)
 
 > 每次调和都从 rootFiber 开始
+
+
+
+
+
+## 几个 fiber 变量
+
+### 几个易解释变量
+
+```js
+{
+	memoizedProps // 父组件的 prop
+  stateNode // DOM 实例
+}
+```
+
+
+
+### mode
+
+即 legcy blocking concurrent 三种模式
+
+legcy 为同步、concurrent 为异步可中断模式
+
+
+
+
+
+
+
+### Update
+
+```js
+const update: Update<*> = {
+  eventTime,
+  // 优先级
+  lane,
+  suspenseConfig,
+  // 更新的类型，包括UpdateState | ReplaceState | ForceUpdate | CaptureUpdate
+  tag: UpdateState,
+  // 更新挂载的数据，不同类型组件挂载的数据不同。对于ClassComponent，payload为this.setState的第一个传参。对于HostRoot，payload为ReactDOM.render的第一个传参。
+  payload: null,
+  // 更新的回调函数
+  callback: null,
+
+  next: null,
+};
+```
+
+
+
+
+
+
+
+### updateQueue
+
+有三种类型：
+
+1. HostComponent： 
+
+   https://react.iamkasong.com/process/completeWork.html#update%E6%97%B6
+
+   https://codesandbox.io/s/updatepayload-pzw36?file=/src/index.js
+
+   数组形式，偶数是 key 奇数是 value
+
+2. ClassComponent 以及 HostComponent （初始化）
+
+   ```js
+   const queue: UpdateQueue<State> = {
+       // 上一次正常执行最后的 state 见 面试.md/React/任务插队如何保证最终结果正确
+       baseState: fiber.memoizedState,
+       // 前一次更新中被跳过的 Update （优先级相关）见 面试.md/React/任务插队如何保证最终结果正确
+       firstBaseUpdate: null,
+       lastBaseUpdate: null,
+       shared: {
+         // Update 对象单向链表，等效于 min-useState 里面的 queue.pending
+         pending: null,
+       },
+       // 数组。保存update.callback !== null的Update。
+       effects: null,
+     };
+   ```
+
+   
+
+3. 
+
+
+
+
+
+### memoizedState
+
+FunctionComponent 对应 fiber 保存的 hooks 链表
+
+
 
 
 
@@ -406,6 +505,12 @@ rootFiber.firstEffect -----------> fiber -----------> fiber
 
 
 
+### diff
+
+根据 key 和 type 来决定能否复用
+
+
+
 ## 初始化全流程
 
 
@@ -429,47 +534,253 @@ render 阶段
 
 
 
+创建一个 Update 对象
 
 
 
 
-# Debug
-
-* jsxDEV
-* ReactElement 生成 Element 对象
-
-是从叶节点向上生成的？？TODO
-
-
-
-* react/packages/react-dom/src/client/ReactDOMLegacy.js render 函数
-* render --》 构建出 fiberRoot
-
-![image-20221105115436942](https://typora-1300781048.cos.ap-beijing.myqcloud.com/img/202211051154293.png)
-
-
-
-* updateContainer 里面会创建 update 对象，并利用 enqueueUpdate 进行
-
-![image-20221105124250840](https://typora-1300781048.cos.ap-beijing.myqcloud.com/img/202211051242092.png)
-
-
-
-**update 对象挂在哪？** 在 fiber 上，那 fiber.memorizeState 的 hook 链表上的 hook 对象上的 pending 是什么？
-
-`react/packages/react-reconciler/src/ReactUpdateQueue.old.js`  enqueueUpdate
-
-
-
-此时完成了 fiberRoot 的构建，current 树还是只有一个 rootFiber 节点
-
-
-
-leygcy 入口 `react/packages/react-reconciler/src/ReactFiberWorkLoop.old.js`  performSyncWorkOnRoot
 
 
 
 
+
+
+
+
+
+## hook 原理
+
+hook 在 mount 和 update 会调用不同的函数，从不同的 disptach 对象取出来
+
+> 同样是根据 fiber.current === null 来进行区分是 mount 还是 update
+
+```js
+// mount时的Dispatcher
+const HooksDispatcherOnMount: Dispatcher = {
+  useCallback: mountCallback,
+  useContext: readContext,
+  useEffect: mountEffect,
+  useImperativeHandle: mountImperativeHandle,
+  useLayoutEffect: mountLayoutEffect,
+  useMemo: mountMemo,
+  useReducer: mountReducer,
+  useRef: mountRef,
+  useState: mountState,
+  // ...省略
+};
+
+// update时的Dispatcher
+const HooksDispatcherOnUpdate: Dispatcher = {
+  useCallback: updateCallback,
+  useContext: readContext,
+  useEffect: updateEffect,
+  useImperativeHandle: updateImperativeHandle,
+  useLayoutEffect: updateLayoutEffect,
+  useMemo: updateMemo,
+  useReducer: updateReducer,
+  useRef: updateRef,
+  useState: updateState,
+  // ...省略
+};
+```
+
+为了避免出现 hook 互相嵌套的现象
+
+ `src/react/v17/react-reconciler/src/ReactFiberHooks.new.js` 
+
+```js
+  ReactCurrentDispatcher.current = ContextOnlyDispatcher;
+```
+
+后续内部调用 hook 就会调用报错的 Dispatch
+
+
+
+### hook 对象
+
+```js
+const hook: Hook = {
+  // !!! 与 fiber.memoizedState 不同，这里是存储
+  memoizedState: null,
+	
+  // 与 https://react.iamkasong.com/state/update.html#updatequeue UpdateQueue 基本一致
+  // 用来存储高优任务先执行的最终状态的正确性
+  baseState: null,
+  baseQueue: null,
+  queue:{
+    // 保存 dispatchAction.bind() ，与 min-useState 一致
+    dispatch: null,
+    lastRenderedReducer: basicStateReducer,
+    lastRenderedState: (initialState: any),
+    // 保存 update 对象
+    pending: null
+  }
+
+  next: null,
+};
+```
+
+`hook.memoizedState` 与 `fiber.memoizedState` 不同，这里 `hook.memoizedState` 存储的是 hook 相关的值
+
+* useState 是 state 的值
+* useReducer 是存 state 值
+* useEffect 存 `useEffect 回调函数` `依赖项` 等的链表数据结构 `effect` ，同时这个 `effect` 链表也会被保存到 `fiber.updateQueue` s
+* useRef 存的是对象，例如 `useRef(1)` => `{current:1}` 
+* useMemo 存的是 `callback() 返回的值` `dep` 
+* useCallback 存的是 `callback` `dep` ，与 useMemo 不同的是存的是函数
+* useContext 没有 memoizedState
+
+
+
+
+
+### useState
+
+#### 初始化
+
+* 初始化 hook 对象，并形成一个 hook 链表，挂载 wip **fiber.memoizedState** 上
+
+  ```js
+  const hook: Hook = {
+    // !!! 与 fiber.memoizedState 不同，这里是存储
+    memoizedState: null,
+  	
+    // 与 https://react.iamkasong.com/state/update.html#updatequeue UpdateQueue 基本一致
+    // 用来存储高优任务先执行的最终状态的正确性
+    baseState: null,
+    baseQueue: null,
+    queue:{
+      // 保存 dispatchAction.bind() ，与 min-useState 一致
+      dispatch: null,
+      lastRenderedReducer: basicStateReducer,
+      lastRenderedState: (initialState: any),
+      // 保存 update 对象，
+      pending: null
+    }
+    next: null,
+  };
+  ```
+
+  basiscStateReducer 函数，`action` 就是 `setState` 传入的参数
+
+  ```js
+  function basicStateReducer<S>(state: S, action: BasicStateAction<S>): S {
+    return typeof action === 'function' ? action(state) : action;
+  }
+  ```
+
+* hook.memoizedState 赋值 initialState
+
+
+
+#### 更新 setState
+
+本质调用的是 `dispatchAction` 
+
+* 申请优先级，legcy 模式下都是同步
+* 创建 Update 对象，会挂在 hook.queue.pending 上
+* 根据当前的阶段不同进行不同逻辑
+  * 在 render 阶段：打上标志位 `didScheduleRenderPhaseUpdateDuringThisPass` 并开始调度
+  * 不在 render 阶段：调度 `hook.lastRenderedReducer` 计算出新的 state ，并进行浅比较，如果相同的话就 return ，不同的话就对 fiber 进行调度 `scheduleUpdateOnFiber` 
+
+
+
+> useReducer 与 useState 只有在 mount 时候 lastRenderedReducer 不同，其余/更新一摸一样
+
+
+
+#### 避免嵌套调用 hook
+
+在计算新 state 之前将 `ReactCurrentDispatcher.current` 置为错误的 dispatch ，后续如果出现嵌套声明 hook 就会调用错误的 dispatch ，然后在执行完之后再恢复
+
+```js
+      // dispatchAction
+			const lastRenderedReducer = queue.lastRenderedReducer;
+      if (lastRenderedReducer !== null) {
+        let prevDispatcher;
+        if (__DEV__) {
+          // 
+          prevDispatcher = ReactCurrentDispatcher.current;
+          ReactCurrentDispatcher.current = InvalidNestedHooksDispatcherOnUpdateInDEV;
+        }
+        try {
+          const currentState: S = (queue.lastRenderedState: any);
+          const eagerState = lastRenderedReducer(currentState, action);
+          update.eagerReducer = lastRenderedReducer;
+          update.eagerState = eagerState;
+          // 浅比较，新 state 与旧  state 
+          if (is(eagerState, currentState)) {
+            return;
+          }
+        } catch (error) {
+          // Suppress the error. It will throw again in the render phase.
+        } finally {
+          if (__DEV__) {
+            // 恢复
+            ReactCurrentDispatcher.current = prevDispatcher;
+          }
+        }
+```
+
+
+
+### useEffect
+
+#### 初始化
+
+所有的 hook 都一样会创建 Hook 对象，hook.memoizedState 等于 `pushEffect` 返回值
+
+`pushEffect` 会生成一个 effect 对象，如果是 mount ，就会创建 `componentUpdateQueue` 并赋值给 `workInProgress.current
+
+```js
+function pushEffect(tag, create, destroy, deps) {
+  const effect = {
+    tag,
+    create,
+    destroy,
+    deps,
+    next: null,
+  };
+  let componentUpdateQueue = currentlyRenderingFiber.updateQueue
+  if (componentUpdateQueue === null) { // 第一个 hook / mount 
+    componentUpdateQueue = {  lastEffect: null  }
+    currentlyRenderingFiber.updateQueue = componentUpdateQueue
+    componentUpdateQueue.lastEffect = effect.next = effect;
+  } else {  // 存在多个effect
+    const lastEffect = componentUpdateQueue.lastEffect;
+    if (lastEffect === null) {
+      componentUpdateQueue.lastEffect = effect.next = effect;
+    } else {
+      const firstEffect = lastEffect.next;
+      lastEffect.next = effect;
+      effect.next = firstEffect;
+      componentUpdateQueue.lastEffect = effect;
+    }
+  }
+  return effect;
+}
+```
+
+
+
+
+
+
+
+
+
+## 优先级
+
+如果选择了 legcy 模式，那么申请到所有的 Lane ( `requestUpdateLane` )都是同步 
+
+
+
+
+
+# 几个变量
+
+* workInProgressHook 链表指针
+* currentlyRenderingFiber 即 workInProgress ，指向 wip fiber 节点 
 
 
 
@@ -481,7 +792,14 @@ leygcy 入口 `react/packages/react-reconciler/src/ReactFiberWorkLoop.old.js`  p
 
 
 
+
+
+
+
+
+
 * completeWork 的处理 props 
+* effectList 的顺序
 * 什么时候执行的 render 函数
 * React 自己实现了事件机制来适配跨平台、Vue 不自己实现事件机制如何适配跨平台的？
 * hook 为什么不能写在循环、条件判断中
