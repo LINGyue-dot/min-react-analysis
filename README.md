@@ -328,6 +328,14 @@ fiber 节点就是根据 `Element` 对象来进行生成的，并且多了
 
 
 
+### 双缓存树
+
+`workInProgress fiber树`: 即将调和渲染的 `fiber` 树。再一次新的组件更新过程中，会从`current`复制一份作为`workInProgress`,更新完毕后，将当前的`workInProgress`树赋值给`current`树。
+
+
+
+
+
 ## 几个 fiber 变量
 
 ### 几个易解释变量
@@ -390,7 +398,7 @@ const update: Update<*> = {
 
    数组形式，偶数是 key 奇数是 value
 
-2. ClassComponent 以及 HostComponent （初始化）
+2. ClassComponent 以及 HostComponent ( ReactDOM.render )
 
    ```js
    const queue: UpdateQueue<State> = {
@@ -400,7 +408,7 @@ const update: Update<*> = {
        firstBaseUpdate: null,
        lastBaseUpdate: null,
        shared: {
-         // Update 对象单向链表，等效于 min-useState 里面的 queue.pending
+         // Update 对象单向链表
          pending: null,
        },
        // 数组。保存update.callback !== null的Update。
@@ -408,19 +416,21 @@ const update: Update<*> = {
      };
    ```
 
-   
-
-3. 
+3. function Component 放的是 useEffect 的 effect 对象
 
 
+
+
+
+*class 组件 Fiber 节点上的多个 Update 会组成链表并被包含在 fiber.updateQueue 中。 函数组件则是存储 useEffect 的 effect 的环状链表。*
 
 
 
 ### memoizedState
 
-FunctionComponent 对应 fiber 保存的 hooks 链表
+FunctionComponent 对应 fiber 保存的 hooks 链表，注意是正序的
 
-
+https://zhuanlan.zhihu.com/p/346696902
 
 
 
@@ -511,30 +521,64 @@ rootFiber.firstEffect -----------> fiber -----------> fiber
 
 
 
-## 初始化全流程
+## 更新/初始化概述
 
+（根据 current 树复制一份生成 wip 树）
 
-
-1. JSX 构建生成 element 树
-2. element 树构建生成 fiber 树
-
-
-
-
-
-render 阶段
-
-* beginWork 阶段，mounted 初始化的话就生成新 fiber 节点，update 的话就生成带 effectTag 的 Fiber 节点
+Begin work -> 根据 wip.tag 调用 `renderWithHooks` 
 
 
 
 
 
-## 更新全流程
+### renderWithHooks
+
+1. 清空 wip 树的 `memoizedState` 和 `updateQueue` ，因为接下来要把新的 hooks 信息挂载到这2个属性上
+2. 
+
+```js
+export function renderWithHooks(
+  current,
+  workInProgress,
+  Component,
+  props,
+  secondArg,
+  nextRenderExpirationTime,
+) {
+  renderExpirationTime = nextRenderExpirationTime;
+  currentlyRenderingFiber = workInProgress;
+
+  workInProgress.memoizedState = null;
+  workInProgress.updateQueue = null;
+  workInProgress.expirationTime = NoWork;
+	// 根据 current 树以及 current.memoizedState 来进行判断是第一次渲染还是更新
+  ReactCurrentDispatcher.current =
+      current === null || current.memoizedState === null
+        ? HooksDispatcherOnMount
+        : HooksDispatcherOnUpdate;
+
+  // 执行函数组件
+  let children = Component(props, secondArg);
+
+  if (workInProgress.expirationTime === renderExpirationTime) { 
+       // ....这里的逻辑我们先放一放
+  }
+	// 更改 disptach 对象，保证只有在函数组件中调用才能成功
+  ReactCurrentDispatcher.current = ContextOnlyDispatcher;
+
+  renderExpirationTime = NoWork;
+  currentlyRenderingFiber = null;
+
+  currentHook = null
+  workInProgressHook = null;
+
+  didScheduleRenderPhaseUpdate = false;
+
+  return children;
+}
+```
 
 
-
-创建一个 Update 对象
 
 
 
@@ -624,7 +668,7 @@ const hook: Hook = {
 
 * useState 是 state 的值
 * useReducer 是存 state 值
-* useEffect 存 `useEffect 回调函数` `依赖项` 等的链表数据结构 `effect` ，同时这个 `effect` 链表也会被保存到 `fiber.updateQueue` s
+* useEffect 存 `useEffect 回调函数` `依赖项` 等的链表数据结构 `effect` ，同时这个 `effect` 链表也会被保存到 `fiber.updateQueue` 
 * useRef 存的是对象，例如 `useRef(1)` => `{current:1}` 
 * useMemo 存的是 `callback() 返回的值` `dep` 
 * useCallback 存的是 `callback` `dep` ，与 useMemo 不同的是存的是函数
@@ -634,9 +678,95 @@ const hook: Hook = {
 
 
 
+### Hook 对象生成 mountWorkInProgressHook
+
+Hook 的生成都是通过 `mountWorkInProgressHook` 
+
+```js
+function mountWorkInProgressHook(): Hook {
+  const hook: Hook = {
+    memoizedState: null,
+    baseState: null,
+    baseQueue: null,
+    queue: null,
+    next: null,
+  };
+
+  if (workInProgressHook === null) {
+    // This is the first hook in the list
+    currentlyRenderingFiber.memoizedState = workInProgressHook = hook;
+  } else {
+    // Append to the end of the list
+    workInProgressHook = workInProgressHook.next = hook;
+  }
+  return workInProgressHook;
+}
+```
+
+
+
+
+
+### hook 对象更新 updateWorkInProgressHook
+
+根据 current 树上的 `memoizedState` （旧 hook 链表）来生成新的 `memoizedState` 
+
+```js
+
+function updateWorkInProgressHook() {
+  let nextCurrentHook;
+  if (currentHook === null) {  /* 如果 currentHook = null 证明它是第一个hooks */
+    const current = currentlyRenderingFiber.alternate;
+    if (current !== null) {
+      nextCurrentHook = current.memoizedState;
+    } else {
+      nextCurrentHook = null;
+    }
+  } else { /* 不是第一个hooks，那么指向下一个 hooks */
+    nextCurrentHook = currentHook.next;
+  }
+  let nextWorkInProgressHook
+  if (workInProgressHook === null) {  //第一次执行hooks
+    nextWorkInProgressHook = currentlyRenderingFiber.memoizedState;
+  } else { 
+    nextWorkInProgressHook = workInProgressHook.next;
+  }
+
+  if (nextWorkInProgressHook !== null) { 
+      /* 这个情况说明 renderWithHooks 执行 过程发生多次函数组件的执行 ，我们暂时先不考虑 */
+    workInProgressHook = nextWorkInProgressHook;
+    nextWorkInProgressHook = workInProgressHook.next;
+    currentHook = nextCurrentHook;
+  } else {
+    invariant(
+      nextCurrentHook !== null,
+      'Rendered more hooks than during the previous render.',
+    );
+    currentHook = nextCurrentHook;
+    const newHook = { //创建一个新的hook
+      memoizedState: currentHook.memoizedState,
+      baseState: currentHook.baseState,
+      baseQueue: currentHook.baseQueue,
+      queue: currentHook.queue,
+      next: null,
+    };
+    if (workInProgressHook === null) { // 如果是第一个hooks
+      currentlyRenderingFiber.memoizedState = workInProgressHook = newHook;
+    } else { // 重新更新 hook
+      workInProgressHook = workInProgressHook.next = newHook;
+    }
+  }
+  return workInProgressHook;
+}
+```
+
+
+
 ### useState
 
 #### 初始化
+
+
 
 * 初始化 hook 对象，并形成一个 hook 链表，挂载 wip **fiber.memoizedState** 上
 
@@ -673,7 +803,11 @@ const hook: Hook = {
 
 
 
-#### 更新 setState
+
+
+
+
+#### 调用 setState
 
 本质调用的是 `dispatchAction` 
 
@@ -730,7 +864,7 @@ const hook: Hook = {
 
 所有的 hook 都一样会创建 Hook 对象，hook.memoizedState 等于 `pushEffect` 返回值
 
-`pushEffect` 会生成一个 effect 对象，如果是 mount ，就会创建 `componentUpdateQueue` 并赋值给 `workInProgress.current
+`pushEffect` 会生成一个 effect 对象添加到 `workInProgress.updateQueue`  
 
 ```js
 function pushEffect(tag, create, destroy, deps) {
@@ -758,6 +892,141 @@ function pushEffect(tag, create, destroy, deps) {
     }
   }
   return effect;
+}
+```
+
+这里最后形成的链表是倒序的
+
+```js
+useEffect(()=>{
+    console.log(1)
+},[ props.a ])
+useEffect(()=>{
+    console.log(2)
+},[])
+useEffect(()=>{
+    console.log(3)
+},[])
+```
+
+<img src="https://typora-1300781048.cos.ap-beijing.myqcloud.com/img/202211062250086.jpeg" alt="图片" style="zoom:50%;" />
+
+
+
+#### 二次声明/更新
+
+生成一个新 hook 对象以及 effect 对象，如果 deps 发生变化的话将 effect 对象放到 `hook.memoizedState` ，最后会在 `commit` 阶段，根据 tag 来决定是否执行 `create` 
+
+```js
+function updateEffectImpl(fiberEffectTag, hookEffectTag, create, deps): void {
+  const hook = updateWorkInProgressHook();
+  const nextDeps = deps === undefined ? null : deps;
+  let destroy = undefined;
+
+  if (currentHook !== null) {
+    const prevEffect = currentHook.memoizedState;
+    destroy = prevEffect.destroy;
+    if (nextDeps !== null) {
+      const prevDeps = prevEffect.deps;
+      if (areHookInputsEqual(nextDeps, prevDeps)) {
+        pushEffect(hookEffectTag, create, destroy, nextDeps);
+        return;
+      }
+    }
+  }
+
+  currentlyRenderingFiber.effectTag |= fiberEffectTag;
+
+  hook.memoizedState = pushEffect(
+    HookHasEffect | hookEffectTag,
+    create,
+    destroy,
+    nextDeps,
+  );
+}
+```
+
+
+
+
+
+
+
+### useMemo / useCallback
+
+
+
+#### 初始化
+
+生成一个 hook 对象，然后将值和 deps 缓存在 `hook.memoizedState` 上
+
+```js
+
+function mountMemo(nextCreate,deps){
+  const hook = mountWorkInProgressHook();
+  const nextDeps = deps === undefined ? null : deps;
+  const nextValue = nextCreate();
+  hook.memoizedState = [nextValue, nextDeps];
+  return nextValue;
+}
+```
+
+#### 更新
+
+* deps 如果没有变化的话，直接返回
+* deps 发生变化的话，就执行 useMemo 函数，并赋值给 `hook.memoizedState`
+
+```js
+function updateMemo(
+  nextCreate,
+  deps,
+) {
+  const hook = updateWorkInProgressHook();
+  const nextDeps = deps === undefined ? null : deps; // 新的 deps 值
+  const prevState = hook.memoizedState; 
+  if (prevState !== null) {
+    if (nextDeps !== null) {
+      const prevDeps = prevState[1]; // 之前保存的 deps 值
+      if (areHookInputsEqual(nextDeps, prevDeps)) { //判断两次 deps 值
+        return prevState[0];
+      }
+    }
+  }
+  const nextValue = nextCreate();
+  hook.memoizedState = [nextValue, nextDeps];
+  return nextValue;
+}
+```
+
+
+
+
+
+### useRef
+
+#### 初始化
+
+申请一个 hook 对象，然后用一个对象存储起来
+
+```js
+function mountRef(initialValue) {
+  const hook = mountWorkInProgressHook();
+  const ref = {current: initialValue};
+  hook.memoizedState = ref;
+  return ref;
+}
+```
+
+
+
+#### 更新
+
+返回缓存的值
+
+```js
+function updateRef(initialValue){
+  const hook = updateWorkInProgressHook()
+  return hook.memoizedState
 }
 ```
 
@@ -812,3 +1081,5 @@ function pushEffect(tag, create, destroy, deps) {
 https://react.iamkasong.com/
 
 https://juejin.cn/book/7070324244772716556/section/7137083930078871589
+
+https://mp.weixin.qq.com/s?src=11&timestamp=1667731065&ver=4150&signature=sDeCXgFElF0rfs2Zx5fYb6*fJvfeAlWbJVpyRNDgLsX9TeS28zhXyZKAeM-661eMrkPVZZ1SygJBvSQ5tJz6JiH8wvdjX1iIMy*rQQcW9hDwKbb1vSGYhIwnaCw5K2Y6&new=1
