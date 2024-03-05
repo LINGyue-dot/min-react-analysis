@@ -7,7 +7,7 @@ function render(element, container) {
 }
 
 /**
- * 根据 React.Element/ 虚拟 DOM 转换为真实的 DOM，只构造出当前的 element 对应的节点，而不去考虑子节点或数组节点的情况
+ * 根据 React.Element/ 虚拟 DOM 转换为真实的 DOM，只构造出当前的 element 对应的节点，而不去考虑子节点或数组节点的情况（在 fiber 构建/更新过程中做）
  * 1. 普通节点
  * 2. 是具有 type 的节点
  */
@@ -38,18 +38,10 @@ function renderDOM(element) {
   if (typeof type === "string") {
     // 普通节点
     dom = document.createElement(type);
+  } else if (typeof type === "function") {
+    // 创建个空白占位
+    dom = document.createDocumentFragment();
   }
-  // function 的情况也放在 fiber 里面去做
-  //   else if (typeof type === "function") {
-  //     // 函数节点，执行获取 jsx 对象
-  //     const jsx = type(props);
-  //     dom = renderDOM(jsx);
-  //   }
-  // children 递归的情况也放在 fiber 里面去做
-  //   if (props && props.children) {
-  //     const childrenDom = renderDOM(props.children);
-  //     if (childrenDom) dom.appendChild(childrenDom);
-  //   }
   updateAttributes(dom, props);
   return dom;
 }

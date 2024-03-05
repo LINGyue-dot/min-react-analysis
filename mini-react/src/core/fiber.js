@@ -1,3 +1,4 @@
+import { commitRoot } from "./commit";
 import ReactDOM from "./react-dom";
 let nextUnitOfWork = null;
 let rootFiber = null;
@@ -25,14 +26,6 @@ function performUnitOfWork(workInProgress) {
     // 创建 DOM 节点
     workInProgress.stateNode = ReactDOM.renderDOM(workInProgress.element);
   }
-  // .return 指向父节点
-  if (workInProgress.return && workInProgress.stateNode) {
-    let parentFiber = workInProgress.return;
-    // 如果 fiber 的父节点没有 dom 的话，就一直向上找具有 DOM 节点的 fiber
-    while (!parentFiber.stateNode) parentFiber = parentFiber.return;
-    parentFiber.stateNode.appendChild(workInProgress.stateNode);
-  }
-  //
   let children =
     workInProgress.element.props && workInProgress.element.props.children;
   let type = workInProgress.element.type;
@@ -97,6 +90,11 @@ function workLoop(deadline) {
   while (nextUnitOfWork && !shouldYield) {
     performUnitOfWork(nextUnitOfWork);
     shouldYield = deadline.timeRemaining() < 1;
+  }
+  // 本次更新的 fiber 树已构建完成，进入 commit 阶段
+  if (!nextUnitOfWork && rootFiber) {
+    commitRoot(rootFiber);
+    rootFiber = null;
   }
   requestIdleCallback(workLoop);
 }

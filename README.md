@@ -18,6 +18,7 @@
 * props 变化如何触发子组件更新
 * 事件合成机制是怎么做的？
 * hooks useState、useContext 、useLayoutEffect 、useEffect 等
+* 异步可中断的话，会不会使得 state 更新/ hook 执行，但是此时视图还是旧的（因为当前全部 DOM 还没有构建完成）
 
 
 
