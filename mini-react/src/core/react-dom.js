@@ -23,14 +23,6 @@ function renderDOM(element) {
   if (typeof element === "number") {
     dom = document.createTextNode(String(element));
   }
-  // array 数组的情况放在 fiber 中去做
-  //   if (Array.isArray(element)) {
-  //     dom = document.createDocumentFragment();
-  //     for (let item of element) {
-  //       const child = renderDOM(item);
-  //       if (child) dom.appendChild(child);
-  //     }
-  //   }
   if (dom) return dom;
 
   // 是对象

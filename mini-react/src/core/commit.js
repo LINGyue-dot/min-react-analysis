@@ -1,5 +1,5 @@
 import { getDeletions } from "./fiber";
-import ReactDOM, { updateAttributes } from "./react-dom";
+import { updateAttributes } from "./react-dom";
 
 export function commitRoot(rootFiber) {
   const deletions = getDeletions();
@@ -16,7 +16,6 @@ function commitWork(fiber) {
 
   if (fiber.flag === "Deletion") {
     if (typeof fiber.element?.type !== "function") {
-      console.log(fiber, fiber.return);
       parentDom.removeChild(fiber.stateNode);
     }
     return;

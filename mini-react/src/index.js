@@ -1,5 +1,6 @@
 // import { Component, useState } from './core/react';
 import ReactDOM from "./core/react-dom";
+import { useState } from "./core/useState";
 import "./index.css";
 
 // class ClassComponent extends Component {
@@ -27,16 +28,16 @@ import "./index.css";
 // }
 
 function FunctionComponent(props) {
-  // const [count, setCount] = useState(0);
-  // const addCount = () => {
-  //   setCount(count + 1);
-  // };
+  const [count, setCount] = useState(0);
+  const addCount = () => {
+    setCount(count + 1);
+  };
   return (
     <div className="function-component">
       <div>this is a function Component</div>
       <div>prop value is: {props.value}</div>
-      {/* <div>count is: {count}</div> */}
-      {/* <input type="button" value="add count" onClick={addCount} /> */}
+      <div>count is: {count}</div>
+      <input type="button" value="add count" onClick={addCount} />
     </div>
   );
 }
@@ -71,7 +72,6 @@ const jsx = (
 ReactDOM.render(jsx, document.getElementById("root"));
 
 setTimeout(() => {
-  return;
   const jsx = (
     <div className="deep1-box">
       {/* <ClassComponent value={666} /> */}

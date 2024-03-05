@@ -6,6 +6,9 @@ let workInProgressRoot = null; // 当前工作的 fiber 树根
 let currentRoot = null; // 上一次渲染的 fiber 树根
 let deletions = []; // 要删除 dom 的 fiber
 
+let currentFunctionFiber = null; // 当前正在执行的函数对应 fiber
+let hookIndex = 0; // 当前正在执行的函数组件 hook 索引
+
 export function createRoot(element, container) {
   workInProgressRoot = {
     stateNode: container, // 记录对应的真实 DOM
@@ -30,17 +33,17 @@ function performUnitOfWork(workInProgress) {
     // 创建 DOM 节点
     workInProgress.stateNode = ReactDOM.renderDOM(workInProgress.element);
   }
+
+  // 构建 fiber 树
   let children =
     workInProgress.element.props && workInProgress.element.props.children;
   let type = workInProgress.element.type;
   if (typeof type === "function") {
     // React 组件，这里默认只考虑函数组件
-    const { props, type: Fn } = workInProgress.element;
-    const jsx = Fn(props);
-    children = [jsx]; // 默认同一用数组进行表示
+    // 生成/更新函数组件的 fiber
+    updateFunctionComponent(workInProgress);
   }
 
-  // 构建 fiber 树
   if (children || children === 0) {
     // 存在 children 时候
     let elements = Array.isArray(children) ? children : [children];
@@ -90,11 +93,38 @@ function workLoop(deadline) {
   requestIdleCallback(workLoop);
 }
 
+// 函数组件更新 -> 生成函数组件对应的 fiber 
+function updateFunctionComponent(fiber) {
+  currentFunctionFiber = fiber;
+  currentFunctionFiber.hooks = [];
+  hookIndex = 0;
+  const { props, type: Fn } = fiber.element;
+  const jsx = Fn(props);
+  reconcileChildren(fiber, [jsx]);
+}
+
+// 开始更新渲染逻辑
+export function commitRender() {
+  workInProgressRoot = {
+    stateNode: currentRoot.stateNode,
+    element: currentRoot.element,
+    alternate: currentRoot,
+  };
+  nextUnitOfWork = workInProgressRoot;
+}
+
 export function deleteFiber(fiber) {
   deletions.push(fiber);
 }
 export function getDeletions() {
   return deletions;
+}
+
+export function getCurrentFunctionFiber() {
+  return currentFunctionFiber;
+}
+export function getHookIndex() {
+  return hookIndex++;
 }
 
 requestIdleCallback(workLoop);
