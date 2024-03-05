@@ -1,17 +1,17 @@
 import { createRoot } from "./fiber";
 
 function render(element, container) {
-  const dom = renderDom(element);
+  const dom = renderDOM(element);
   container.appendChild(dom);
   createRoot(element, container);
 }
 
 /**
- * 根据 React.Element/ 虚拟 DOM 转换为真实的 DOM
+ * 根据 React.Element/ 虚拟 DOM 转换为真实的 DOM，只构造出当前的 element 对应的节点，而不去考虑子节点或数组节点的情况
  * 1. 普通节点
  * 2. 是具有 type 的节点
  */
-function renderDom(element) {
+function renderDOM(element) {
   // 这里可以观测下 JSX 的 element 对象是什么样的
   //   console.log(element); // 见文件底部注释
   let dom;
@@ -23,14 +23,14 @@ function renderDom(element) {
   if (typeof element === "number") {
     dom = document.createTextNode(String(element));
   }
-
-  if (Array.isArray(element)) {
-    dom = document.createDocumentFragment();
-    for (let item of element) {
-      const child = renderDom(item);
-      if (child) dom.appendChild(child);
-    }
-  }
+  // array 数组的情况放在 fiber 中去做
+  //   if (Array.isArray(element)) {
+  //     dom = document.createDocumentFragment();
+  //     for (let item of element) {
+  //       const child = renderDOM(item);
+  //       if (child) dom.appendChild(child);
+  //     }
+  //   }
   if (dom) return dom;
 
   // 是对象
@@ -38,16 +38,18 @@ function renderDom(element) {
   if (typeof type === "string") {
     // 普通节点
     dom = document.createElement(type);
-  } else if (typeof type === "function") {
-    // 函数节点，执行获取 jsx 对象
-    const jsx = type(props);
-    dom = renderDom(jsx);
   }
-  // ??? 这里感觉有点问题，真实情况应该是子组件控制
-  if (props && props.children) {
-    const childrenDom = renderDom(props.children);
-    if (childrenDom) dom.appendChild(childrenDom);
-  }
+  // function 的情况也放在 fiber 里面去做
+  //   else if (typeof type === "function") {
+  //     // 函数节点，执行获取 jsx 对象
+  //     const jsx = type(props);
+  //     dom = renderDOM(jsx);
+  //   }
+  // children 递归的情况也放在 fiber 里面去做
+  //   if (props && props.children) {
+  //     const childrenDom = renderDOM(props.children);
+  //     if (childrenDom) dom.appendChild(childrenDom);
+  //   }
   updateAttributes(dom, props);
   return dom;
 }
@@ -70,6 +72,7 @@ function updateAttributes(dom, attributes) {
 
 const ReactDOM = {
   render,
+  renderDOM,
 };
 
 export default ReactDOM;

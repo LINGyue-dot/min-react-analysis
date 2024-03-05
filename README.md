@@ -17,6 +17,7 @@
 
 * props 变化如何触发子组件更新
 * 事件合成机制是怎么做的？
+* hooks useState、useContext 、useLayoutEffect 、useEffect 等
 
 
 
