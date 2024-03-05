@@ -1,6 +1,6 @@
 // import { Component, useState } from './core/react';
-import ReactDOM from './core/react-dom';
-import './index.css';
+import ReactDOM from "./core/react-dom";
+import "./index.css";
 
 // class ClassComponent extends Component {
 //   constructor(props) {
@@ -41,14 +41,13 @@ function FunctionComponent(props) {
   );
 }
 
-
 const jsx = (
   <div className="deep1-box">
     {/* <ClassComponent value={666} /> */}
     <FunctionComponent value={100} />
     <div className="deep2-box-1">
       <a href="https://github.com/zh-lx/mini-react">mini react link</a>
-      <p style={{ color: 'red' }}> this is a red p</p>
+      <p style={{ color: "red" }}> this is a red p</p>
       <div className="deep3-box">
         {true && <div>condition true</div>}
         {false && <div>condition false</div>}
@@ -56,17 +55,50 @@ const jsx = (
           type="button"
           value="say hello"
           onClick={() => {
-            alert('hello');
+            alert("hello");
           }}
         />
       </div>
     </div>
     <div className="deep2-box-2">
-      {['item1', 'item2', 'item3'].map((item) => (
+      {["item1", "item2", "item3"].map((item) => (
         <li key={item}>{item}</li>
       ))}
     </div>
   </div>
 );
 
-ReactDOM.render(jsx, document.getElementById('root'));
+ReactDOM.render(jsx, document.getElementById("root"));
+
+setTimeout(() => {
+  return;
+  const jsx = (
+    <div className="deep1-box">
+      {/* <ClassComponent value={666} /> */}
+      <FunctionComponent value={100} />
+      <div className="deep2-box-1">
+        <p> this is a red p</p>
+        <div className="deep3-box">
+          {true && <div>condition true</div>}
+          {false && <div>condition false</div>}
+          <input
+            type="button"
+            value="say hello"
+            onClick={() => {
+              alert("hello");
+            }}
+          />
+        </div>
+      </div>
+      <div className="deep2-box-2">
+        {["item1", "item2", "item3"].map((item) => (
+          <li style={{ fontSize: "20px" }} key={item}>
+            {item}
+          </li>
+        ))}
+      </div>
+    </div>
+  );
+
+  ReactDOM.render(jsx, document.getElementById("root"));
+}, 2000);

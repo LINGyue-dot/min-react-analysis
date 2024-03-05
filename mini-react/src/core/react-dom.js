@@ -46,20 +46,53 @@ function renderDOM(element) {
   return dom;
 }
 
-function updateAttributes(dom, attributes) {
-  if (!attributes) return;
-  Object.keys(attributes).forEach((key) => {
-    if (key.startsWith("on")) {
-      // 事件处理
-      const eventName = key.slice(2).toLocaleLowerCase();
-      dom.addEventListener(eventName, attributes[key]);
-    } else if (key === "className") {
-      const classes = attributes[key].split(" ");
-      classes.forEach((classKey) => {
-        dom.classList.add(classKey);
-      });
-    }
-  });
+export function updateAttributes(dom, attributes, oldAttributes) {
+  if (oldAttributes) {
+    // 有旧属性，移除旧属性
+    Object.keys(oldAttributes).forEach((key) => {
+      if (key.startsWith("on")) {
+        // 移除旧事件
+        const eventName = key.slice(2).toLowerCase();
+        dom.removeEventListener(eventName, oldAttributes[key]);
+      } else if (key === "className") {
+        // className 的处理
+        const classes = oldAttributes[key].split(" ");
+        classes.forEach((classKey) => {
+          dom.classList.remove(classKey);
+        });
+      } else if (key === "style") {
+        // style处理
+        const style = oldAttributes[key];
+        Object.keys(style).forEach((styleName) => {
+          dom.style[styleName] = "initial";
+        });
+      } else {
+        if (key !== "children") dom[key] = "";
+      }
+    });
+  }
+
+  attributes &&
+    Object.keys(attributes).forEach((key) => {
+      if (key.startsWith("on")) {
+        // 事件处理
+        const eventName = key.slice(2).toLocaleLowerCase();
+        dom.addEventListener(eventName, attributes[key]);
+      } else if (key === "className") {
+        const classes = attributes[key].split(" ");
+        classes.forEach((classKey) => {
+          dom.classList.add(classKey);
+        });
+      } else if (key === "style") {
+        // style处理
+        const style = attributes[key];
+        Object.keys(style).forEach((styleName) => {
+          dom.style[styleName] = style[styleName];
+        });
+      } else {
+        if (key !== "children") dom[key] = attributes[key];
+      }
+    });
 }
 
 const ReactDOM = {

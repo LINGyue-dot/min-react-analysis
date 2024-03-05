@@ -1,17 +1,21 @@
 import { commitRoot } from "./commit";
 import ReactDOM from "./react-dom";
+import { reconcileChildren } from "./reconcile";
 let nextUnitOfWork = null;
-let rootFiber = null;
+let workInProgressRoot = null; // 当前工作的 fiber 树根
+let currentRoot = null; // 上一次渲染的 fiber 树根
+let deletions = []; // 要删除 dom 的 fiber
 
 export function createRoot(element, container) {
-  rootFiber = {
+  workInProgressRoot = {
     stateNode: container, // 记录对应的真实 DOM
     // 虚拟 DOM
     element: {
       props: { children: [element] },
     },
+    alternate: currentRoot,
   };
-  nextUnitOfWork = rootFiber;
+  nextUnitOfWork = workInProgressRoot;
 }
 
 /**
@@ -42,24 +46,7 @@ function performUnitOfWork(workInProgress) {
     let elements = Array.isArray(children) ? children : [children];
     elements = elements.flat();
 
-    let index = 0;
-    let prevSibling = null; // 记录上一个兄弟节点
-    while (index < elements.length) {
-      const element = elements[index];
-      const newFiber = {
-        element,
-        return: workInProgress,
-        stateNode: null,
-      };
-      // 创建
-      if (index === 0) {
-        workInProgress.child = newFiber;
-      } else {
-        prevSibling.sibling = newFiber;
-      }
-      prevSibling = newFiber;
-      index++;
-    }
+    reconcileChildren(workInProgress, elements);
   }
 
   // 设置下一个工作单元
@@ -92,11 +79,22 @@ function workLoop(deadline) {
     shouldYield = deadline.timeRemaining() < 1;
   }
   // 本次更新的 fiber 树已构建完成，进入 commit 阶段
-  if (!nextUnitOfWork && rootFiber) {
-    commitRoot(rootFiber);
-    rootFiber = null;
+  if (!nextUnitOfWork && workInProgressRoot) {
+    // 进入 commit 阶段
+    commitRoot(workInProgressRoot);
+    // commit 结束，保留现在的 fiber 树
+    deletions = [];
+    currentRoot = workInProgressRoot;
+    workInProgressRoot = null;
   }
   requestIdleCallback(workLoop);
+}
+
+export function deleteFiber(fiber) {
+  deletions.push(fiber);
+}
+export function getDeletions() {
+  return deletions;
 }
 
 requestIdleCallback(workLoop);

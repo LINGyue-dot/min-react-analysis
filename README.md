@@ -42,6 +42,12 @@
 
 
 
+# diff 算法
+
+https://vue3js.cn/interview/React/diff.html#%E4%B8%89%E3%80%81%E6%B3%A8%E6%84%8F%E4%BA%8B%E9%A1%B9
+
+
+
 # R18/R19 的变化
 
 
