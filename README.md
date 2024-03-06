@@ -12,7 +12,7 @@
 
 分为两个部分 render 阶段（调度和调和）和 commit 阶段（更新渲染）
 
-<img src="https://typora-1300781048.cos.ap-beijing.myqcloud.com/img/202403051454659.awebp" alt="img" style="zoom:50%;" />
+![img](https://typora-1300781048.cos.ap-beijing.myqcloud.com/img/202403051454659.awebp)
 
 
 
@@ -152,9 +152,9 @@ key 用于 diff 算法，但部分情况下有 key 不一定比无 key 性能好
 
 例如给 div 绑定 `onClick` 事件，但是在浏览器中该 DOM 的 click event 绑定的是 `noop` 
 
-React 会将所有事件按需绑定到 document 上，通过冒泡的形式触发 document 上的事件，并不会将事件绑定到真实的 DOM 上。同时一个事件可能有多个事件绑定在 document 上，如 `onChange` ，此时 document 上可能有 `blur` `change` `input` 等事件绑定，如下
+React 会将所有事件按需绑定到 root 根节点上 上，通过冒泡的形式触发 document 上的事件，并不会将事件绑定到真实的 DOM 上。同时一个事件可能有多个事件绑定在 document 上，如 `onChange` ，此时 document 上可能有 `blur` `change` `input` 等事件绑定，如下
 
-<img src="https://typora-1300781048.cos.ap-beijing.myqcloud.com/img/202403061242407.png" alt="image-20240306124228160" style="zoom: 25%;" />
+<img src="https://typora-1300781048.cos.ap-beijing.myqcloud.com/img/202403061506861.png" alt="image-20240306150618616" style="zoom: 33%;" />
 
 这么做的原因主要是跨平台的考虑，同时兼容不同浏览器，保证 React 的事件行为是一致的
 
@@ -180,9 +180,78 @@ React 会将所有事件按需绑定到 document 上，通过冒泡的形式触�
 
 
 
-# R18/R19 的变化
+# R18 变化
+
+## useEffect 执行两次
+
+`strictMode` `dev` 下 `useEffect` 默认执行两次
+
+1. React 模拟立刻卸载和重新挂载组件
+2. 为了让开发者尽可能写不影响应用正常运行的回调函数（铺垫未来新功能）
 
 
+
+## 根据 api 调用情况来决定是否并发更新
+
+> R17 中是通过内部全局变量进行统一标记
+
+<img src="https://typora-1300781048.cos.ap-beijing.myqcloud.com/img/202403061524665.png" alt="image-20240306152427326" style="zoom:50%;" />
+
+
+
+## 多了几个并发模式的 hook
+
+
+
+### useDeferredValue
+
+```typescript
+import React, { useState, useEffect, useDeferredValue } from 'react';
+
+const App: React.FC = () => {
+  const [list, setList] = useState<any[]>([]);
+  useEffect(() => {
+    setList(new Array(10000).fill(null));
+  }, []);
+  // 使用了并发特性，开启并发更新
+  const deferredList = useDeferredValue(list);
+  return (
+    <>
+      {deferredList.map((_, i) => (
+        <div key={i}>{i}</div>
+      ))}
+    </>
+  );
+};
+
+export default App;
+```
+
+<img src="https://typora-1300781048.cos.ap-beijing.myqcloud.com/img/202403061528149.awebp" alt="QQ截图20220505072516.jpg" style="zoom:67%;" />
+
+普通情况下（非并发）
+
+```typescript
+import React, { useState, useEffect } from 'react';
+
+const App: React.FC = () => {
+  const [list, setList] = useState<any[]>([]);
+  useEffect(() => {
+    setList(new Array(10000).fill(null));
+  }, []);
+  return (
+    <>
+      {list.map((_, i) => (
+        <div key={i}>{i}</div>
+      ))}
+    </>
+  );
+};
+
+export default App;
+```
+
+![999.jpg](https://typora-1300781048.cos.ap-beijing.myqcloud.com/img/202403061528647.awebp)
 
 
 
@@ -199,3 +268,5 @@ React 会将所有事件按需绑定到 document 上，通过冒泡的形式触�
 [聊一聊Diff算法（React、Vue2.x、Vue3.x）](https://zhuanlan.zhihu.com/p/149972619)
 
 [React 的 Concurrent Mode 是否有过度设计的成分？](https://www.zhihu.com/question/434791954)
+
+[React18 新特性](https://juejin.cn/post/7094037148088664078)
