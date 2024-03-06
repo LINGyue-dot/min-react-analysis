@@ -195,7 +195,7 @@ React 会将所有事件按需绑定到 root 根节点上 上，通过冒泡的�
 
 > R17 中是通过内部全局变量进行统一标记
 
-<img src="https://typora-1300781048.cos.ap-beijing.myqcloud.com/img/202403061524665.png" alt="image-20240306152427326" style="zoom:50%;" />
+<img src="https://typora-1300781048.cos.ap-beijing.myqcloud.com/img/202403061524665.png" alt="image-20240306152427326" style="zoom: 25%;" />
 
 
 
