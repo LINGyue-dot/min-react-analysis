@@ -18,25 +18,61 @@
 
 所有的内部执行由调用模仿 `requestIdleCallback` 的 `workloop` 函数，每隔一段时间执行一次，该函数检查当前全局变量 `nextUnitOfWork` 是否存在 fiber 节点
 
-> 1 2 属于 render 阶段，生成 fiber 树并打上 flag 
 
-1. 调用 `performUnitOfWork ` ，根据 `nextUniofWork` fiber 节点上的虚拟 DOM `type` 进行不同的处理
 
-   1. 原生 HTML 类型，如果需要则创建真实 DOM （ `fiber.stateNode` 为空）
-   2. 函数组件类型，执行该函数，得到返回值
-
-   > 处理完该 fiber 之后，会按照如图顺序执行<img src="https://typora-1300781048.cos.ap-beijing.myqcloud.com/img/202403061112759.png" alt="image-20221104002015500" style="zoom:20%;" />
-
-2. 调和 `reconcile` 该 fiber 节点，生成新的 fiber 树
-
-   *  diff 算法对比该 fiber 为根的 fiber 树对应的旧 fiber 树（ `fiber.alternate` 进行获取旧 fiber 节点）
-   * 根据 diff 结果，给 fiber 打上 flag 标志位如 `Placement 添加` `Deletion 删除` `Update 更新` 等副作用标志
-
-3. 当 `nextUnitOfWork` 为空，但是 `workInProgressRoot` wip 树存在时候，表明当前新的 fiber 树已构建完成。就进入 `commit` 阶段，即按照 wip 树修改真实 DOM ，执行如 `appendChild` `insertBefore` `removeChild`  或是更新 DOM 节点的属性等。该阶段不可中断
+1. 调用 `performUnitOfWork ` ，初始时候根据 current 树的 root 生成 wip 树的 root ，并将 wip root 设置为 `nextUnitOfWork` 
+2. 进入 beginWork 和 completeWork 的 Render 阶段
+3. 当 `nextUnitOfWork` 为空，但是 `workInProgressRoot` wip 树存在时候，表明当前新的 fiber 树已构建完成。就进入 `commit` 阶段
 
 
 
+## Render 阶段（可被打断）
 
+Render 阶段是生成新的 fiber 树，主要包括 beginWork 以及 completeWork 两个阶段
+
+
+
+* beginWork ：`reconcile` 调和
+  * 根据当前 `nextUnitOfWork` 指向的 fiber 节点上的 fiber.type 进行不同操作并获取到最新的虚拟 DOM 生成新的 fiber 节点
+    * 原生 HTML 不进行操作（不需要生成新的 vdom ）
+    * **调用函数组件**（执行 useState 等 hook ）得到新的 vdom 
+  * diff 算法对比新旧 fiber ，根据 diff 结果给 fiber 打上 flag/effect tag （如果存在 useEffect 等副作用函数也会被打 effect tag ）
+* completeWork ：
+  * 根据 fiber.tag 组件类型来执行不同逻辑，更新/创建 DOM ，如果 `fiber.stateNode` 为空，那么就会调用 api 创建 DOM
+  * 会收集所有带有 flag/effect tag 的 fiber 到单向链表中即 effectList
+
+
+
+### beginWork completeWork 顺序
+
+从根节点开始，向下再向上
+
+<img src="https://typora-1300781048.cos.ap-beijing.myqcloud.com/img/202403110020435.jpeg" alt="Fiber架构" style="zoom: 25%;" />
+
+```sheel
+1. rootFiber beginWork
+2. App Fiber beginWork
+3. div Fiber beginWork
+4. "i am" Fiber beginWork
+5. "i am" Fiber completeWork
+6. span Fiber beginWork
+7. span Fiber completeWork
+8. div Fiber completeWork
+9. App Fiber completeWork
+10. rootFiber completeWork // 没有 KaSong 是因为 React 默认对静态文本节点进行优化了
+```
+
+
+
+
+
+## commit 阶段
+
+commit 阶段就是遍历 effectList 链表并执行对应的逻辑
+
+* before mutation （执行 DOM 操作之前）：遍历 effectList 执行，异步调用 useEffect 
+* mountation （执行 DOM 操作） ：遍历 effectList 进行 DOM 操作
+* layout （执行 DOM 操作后）：同步调用 useLayoutEffect 
 
 
 
@@ -102,7 +138,7 @@ queue.peneding = u1
 
    假如如下
 
-   ![img](https://typora-1300781048.cos.ap-beijing.myqcloud.com/img/202403061224807.jpg)
+   <img src="https://typora-1300781048.cos.ap-beijing.myqcloud.com/img/202403061224807.jpg" alt="img" style="zoom:33%;" />
 
 > 使用三个变量来辅助 diff 算法 
 >
@@ -188,6 +224,10 @@ React 会将所有事件按需绑定到 root 根节点上 上，通过冒泡的�
 
 1. React 模拟立刻卸载和重新挂载组件
 2. 为了让开发者尽可能写不影响应用正常运行的回调函数（铺垫未来新功能）
+
+
+
+> strictMode 辅助 dev ，会提示一些废弃 api 等
 
 
 
