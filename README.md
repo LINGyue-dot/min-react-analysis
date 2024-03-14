@@ -36,7 +36,7 @@ Render 阶段是生成新的 fiber 树，主要包括 beginWork 以及 completeW
   * 根据当前 `nextUnitOfWork` 指向的 fiber 节点上的 fiber.type 进行不同操作并获取到最新的虚拟 DOM 生成新的 fiber 节点
     * 原生 HTML 不进行操作（不需要生成新的 vdom ）
     * **调用函数组件**（执行 useState 等 hook ）得到新的 vdom 
-  * diff 算法对比新旧 fiber ，根据 diff 结果给 fiber 打上 flag/effect tag （如果存在 useEffect 等副作用函数也会被打 effect tag ）
+  * diff 算法对比新旧 vdom ，根据 diff 结果给 fiber 打上 flag/effect tag （如果存在 useEffect 等副作用函数也会被打 effect tag ）
 * completeWork ：
   * 根据 fiber.tag 组件类型来执行不同逻辑，更新/创建 DOM ，如果 `fiber.stateNode` 为空，那么就会调用 api 创建 DOM
   * 会收集所有带有 flag/effect tag 的 fiber 到单向链表中即 effectList
@@ -134,7 +134,7 @@ queue.peneding = u1
    * 如果节点的 type 不同，则直接默认不能复用
    * 如果这个节点是函数/类组件的话会调用 `React.memo` 中的回调函数来决定是否向子节点进行 diff
 
-2. type 相同，如果有 key 的话也会加入 key 进行比较（最终目的都是尽可能复用节点）
+2. type 相同，如果有 key 的话也会加入 key 进行比较（最终目的都是尽可能复用节点）（ React 不会自动添加 key ）
 
    假如如下
 
@@ -160,7 +160,7 @@ queue.peneding = u1
 
 ## key 的作用
 
-key 用于 diff 算法，但部分情况下有 key 不一定比无 key 性能好，如下 `innerText` 性能比移动 dom 更好
+key 用于 diff 算法（用于同层位置比较），但部分情况下有 key 不一定比无 key 性能好，如下 `innerText` 性能比移动 dom 更好
 
 ```html
 1.加key
@@ -193,6 +193,70 @@ React 会将所有事件按需绑定到 root 根节点上 上，通过冒泡的�
 <img src="https://typora-1300781048.cos.ap-beijing.myqcloud.com/img/202403061506861.png" alt="image-20240306150618616" style="zoom: 33%;" />
 
 这么做的原因主要是跨平台的考虑，同时兼容不同浏览器，保证 React 的事件行为是一致的
+
+
+
+
+
+# batchUpdate 批量更新
+
+默认 R17 会将 setState 合并更新，即多次 setState 最后只会有一次的 setState ，但如果在 setTimeout Promise 或者原生 DOM 事件中就会失效，同时打印内容入下（每次 setState 同时出发 render 阶段和 **commit** 阶段）
+
+```tsx
+ const [state, setState] = useState(1);
+  useEffect(() => {
+    console.log(state, 'render');
+  }, [state]);
+  return (
+    <>
+      <div
+        onClick={() => {
+          setTimeout(() => {
+            setState(2); // -->
+            console.log(state); // 2
+            setState(3);
+            console.log(state); // 3
+            setState(5);
+          });
+        }}
+      >
+        qweqwewq
+      </div>
+    </>
+  );
+```
+
+<img src="https://typora-1300781048.cos.ap-beijing.myqcloud.com/img/202403142329336.png" alt="image-20240314232925267" style="zoom:50%;" />
+
+同时可以使用 `flushSync` 来提高优先级来破坏批量更新
+
+```jsx
+  flushSync(() => {
+        setCounter((c) => c + 1);
+    });
+```
+
+
+
+
+
+
+
+## 为什么在 setTimeout 中失效？
+
+因为内部用的是 `isBatchUpdate` 变量来决定当前是否启动合并更新，在函数调用前设置 isBatchUpdate = true ，函数执行完成之后设置 isBatchUpdate = false 
+
+所以在异步函数中由于是 isBatchUpdate = false 所以就无法进行批量更新
+
+R17 中可以使用 unstable_bactchUpdate api 来实现批量更新
+
+> R18 之后对其进行优化，在 setTimeout 中的也进行批量更新
+
+
+
+## R18 如何实现异步批量处理
+
+即不用全局变量，而是改为优先级，同一个宏任务/微任务的优先级 lane 是相同的，所以两个 setState 的优先级 lane 是相同的，从而实现批量更新
 
 
 
@@ -296,6 +360,12 @@ export default App;
 
 
 
+
+# 使用
+
+## HOC
+
+改造/强化子组件，例如 icon 给 input 框架上，就把 icon 的逻辑从子组件剥离出
 
 # 参考
 
