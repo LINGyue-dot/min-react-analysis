@@ -278,6 +278,44 @@ R17 中可以使用 unstable_bactchUpdate api 来实现批量更新
 
 
 
+# 一些 hook
+
+## useCallback 
+
+必须配合 React.memo 或是 shouldComponentUpdate 对比 props return true 就不重新进行渲染
+
+是有一定的成本的（因为增加了额外的 deps 变化判断），**不配合 React.memo 的话就是负优化**
+
+> 注意，props 即使没有变化，也会重新执行子组件函数，除非子组件函数添加上 React.memo
+
+### 什么时候用？
+
+* 函数传递给的子组件过多、或者比较深的层级，一旦变化导致执行多个，可以考虑使用 useCallback 进行优化
+
+> 一般情况下我不用，等到性能问题出现之后或是如上的特殊情况下才配合 React.memo 用
+
+
+
+### _React.memo
+
+默认情况下只会对 props 进行浅比较，若有需要的话就传递第二个函数参数，自定义比较
+
+```js
+React.memo(App,function(preProps,newProps){
+  return true // 不进行重新渲染
+}) // 
+```
+
+
+
+
+
+## useMemo
+
+相对简单，useMemo 一般用于计算复杂/耗时逻辑得出的状态，以避免重新执行函数的时候重复进行复杂计算
+
+
+
 
 
 # R18 变化
@@ -309,7 +347,7 @@ R17 中可以使用 unstable_bactchUpdate api 来实现批量更新
 
 ### useDeferredValue
 
-```typescript
+```jsx
 import React, { useState, useEffect, useDeferredValue } from 'react';
 
 const App: React.FC = () => {
@@ -361,11 +399,26 @@ export default App;
 
 
 
+# R19
+
+* react forget 编译器，相当于自动添加 useMemo useCallback React.memo 等函数
+* useOptimistic 乐观更新
+
 # 使用
 
 ## HOC
 
 改造/强化子组件，例如 icon 给 input 框架上，就把 icon 的逻辑从子组件剥离出
+
+
+
+## 如何设计一个组件
+
+1. 组件定位：业务组件、通用组件
+2. 传参的考虑，通用组件就支持更多 props 传入，业务组件的话就少一些 props 
+3. 数据流考虑：props 传递，还是 context 获取全局
+4. 内部数据变化是否不要影响外部的更新，例如将数据用 useRef 
+5. 样式覆盖方案： .module.css 还是 inline-style 
 
 # 参考
 
